@@ -1,14 +1,27 @@
 from datetime import datetime
+from typing import Any
 
-
-# ===================
-# Core Data Structures
-# ===================
 class ResourceRequirements:
-    def __init__(self, cpu_cores: int, memory_gb: float, gpu_units: int = 0):
-        self.cpu_cores = cpu_cores
-        self.memory_gb = memory_gb
-        self.gpu_units = gpu_units
+    def __init__(self, **kwargs):
+        self.store = kwargs or {}
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == 'store':
+            super().__setattr__(name, value)
+        else:
+            self.store[name] = value
+
+    def __getattr__(self, name):
+        try:
+            return self.store[name]
+        except KeyError as e:
+            raise AttributeError(f"'ResourceRequirements' has no resource '{name}'") from e
+
+    def copy(self):
+        return ResourceRequirements(**self.store)
+
+    def serialize(self) -> str:
+        return ",".join([f"{key}:{value}" for key, value in sorted(self.store.items())])
 
 
 class Job:
@@ -29,9 +42,10 @@ class Job:
         self.status = "queued"  # queued/running/completed/failed
 
     def serialize(self) -> str:
+        # Get all resource requirements dynamically from the store
+        
         return (
             f"{self.id}|{self.priority}|{self.user_id}|"
-            f"{self.resources.cpu_cores}|{self.resources.memory_gb}|"
-            f"{self.resources.gpu_units}|{self.command}|"
+            f"{self.resources.serialize()}|{self.command}|"
             f"{self.submission_time.timestamp()}"
         )

@@ -1,13 +1,13 @@
 import hashlib
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 import copy
 
 from .models import ResourceRequirements, Job
 
 
 # =============
-# Merkle Tree
+# Merkle Tree (Unchanged)
 # =============
 class MerkleTree:
     def __init__(self):
@@ -53,7 +53,7 @@ class Node:
 
 
 # =================
-# Job Manager System
+# Job Manager System (Refactored)
 # =================
 class JobManager:
     def __init__(self):
@@ -63,7 +63,6 @@ class JobManager:
         self.current_root_hash: Optional[str] = None
         self._update_merkle_root()
 
-    # CRUD Operations
     def create_job(
         self,
         job_id: str,
@@ -72,6 +71,7 @@ class JobManager:
         resources: ResourceRequirements,
         command: str,
     ) -> Job:
+        """Create a new job with dynamic resource requirements"""
         if job_id in self.active_jobs:
             raise ValueError(f"Job {job_id} already exists")
 
@@ -87,10 +87,18 @@ class JobManager:
         return list(self.active_jobs.values())
 
     def update_job(self, job_id: str, **kwargs) -> Job:
+        """Update job attributes, including dynamic resource requirements"""
         if job_id not in self.active_jobs:
             raise KeyError(f"Job {job_id} not found")
 
         job = self.active_jobs[job_id]
+        
+        if 'resources' in kwargs:
+            if not isinstance(kwargs['resources'], ResourceRequirements):
+                raise ValueError("Resources must be a ResourceRequirements object")
+            job.resources = kwargs.pop('resources')
+        
+        # Update other attributes
         for key, value in kwargs.items():
             if hasattr(job, key):
                 setattr(job, key, value)
@@ -177,27 +185,36 @@ class JobManager:
 
 
 # ==============
-# Test
+# Test (Updated)
 # ==============
 if __name__ == "__main__":
     # Initialize two managers
     manager1 = JobManager()
     manager2 = JobManager()
 
-    # Create jobs in manager1
+    # Create jobs in manager1 with dynamic resources
     manager1.create_job(
-        "J1", 1, "user1", ResourceRequirements(4, 8.0), "python script1.py"
+        "J1", 
+        1, 
+        "user1", 
+        ResourceRequirements(cpu_cores=4, memory_gb=8.0), 
+        "python script1.py"
     )
     manager1.create_job(
-        "J2", 2, "user2", ResourceRequirements(2, 4.0), "python script2.py"
+        "J2", 
+        2, 
+        "user2", 
+        ResourceRequirements(cpu_cores=2, memory_gb=4.0, gpu_units=1), 
+        "python script2.py"
     )
 
     # Clone manager1 to manager2
     manager2.active_jobs = copy.deepcopy(manager1.active_jobs)
     manager2._update_merkle_root()
 
-    # Modify a job in manager2
-    manager2.update_job("J1", priority=3)
+    # Modify a job in manager2 with new resource structure
+    new_resources = ResourceRequirements(cpu_cores=8, memory_gb=16.0)
+    manager2.update_job("J1", priority=3, resources=new_resources)
 
     # Compare states
     diff = manager1.compare_states(manager2)
